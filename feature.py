@@ -1,4 +1,6 @@
 import pandas as pd
+import numpy as np
+import math
 
 import statistics as st
 
@@ -9,16 +11,58 @@ class Feature():
 
     def __init__(self, series):
         self.series = series
+        self.filter_series()
+
+    def filter_series(self):
+        self.series = pd.Series([xi for xi in self.series if not np.isnan(xi)])
 
     def getStats(self):
         return [
-            st.count(self.series),
-            st.mean(self.series),
-            st.std(self.series),
-            st.min(self.series),
-            st.percentile(self.series, 25),
-            st.percentile(self.series, 50),
-            st.percentile(self.series, 75),
-            st.max(self.series)
+            self.count(),
+            self.mean(),
+            self.std(),
+            self.min(),
+            self.percentile(25),
+            self.percentile(50),
+            self.percentile(75),
+            self.max()
         ]
-    
+
+    def sum(self):
+        sum = 0
+        for xi in self.series:
+            sum += xi
+        return sum
+
+    def count(self):
+        return len(self.series)
+
+    def mean(self):
+        return self.sum() / self.count()
+
+    def std(self):
+        mean = self.mean()
+        deviations = Feature(pd.Series([(xi - mean) ** 2 for xi in self.series]))
+        variance = deviations.sum() / (deviations.count() - 1)
+        return math.sqrt(variance)
+
+    def min(self):
+        minX = self.series[0]
+        for xi in self.series:
+            if xi < minX:
+                minX = xi
+        return minX
+
+    def percentile(self, q):
+        x = self.series.sort_values().reset_index(drop=True)
+        findex = q * (self.count() - 1) / 100
+        lower = math.floor(findex)
+        fraction = findex - lower
+        return x[lower] + (x[lower + 1] - x[lower]) * fraction
+
+    def max(self):
+        maxX = self.series[0]
+        for xi in self.series:
+            if xi > maxX:
+                maxX = xi
+        return maxX
