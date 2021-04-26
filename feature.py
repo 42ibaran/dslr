@@ -12,6 +12,12 @@ class Feature():
     def __init__(self, series):
         self.series = series
         self.filter_series()
+        self.standardize()
+
+    def standardize(self):
+        self.mean_denorm = self.mean()
+        self.std_denorm = self.std()
+        self.series = (self.series - self.mean_denorm) / self.std_denorm
 
     def filter_series(self):
         self.series = pd.Series([xi for xi in self.series if not np.isnan(xi)])
