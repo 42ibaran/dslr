@@ -1,23 +1,10 @@
 import argparse
 import pandas as pd
-import numpy as np
 
 from logger import *
-import statistics as st
+from data import Data
 
 RESULT_FILENAME = "describe.csv"
-
-def getStats(x):
-    return [
-        st.count(x),
-        st.mean(x),
-        st.std(x),
-        st.min(x),
-        st.percentile(x, 25),
-        st.percentile(x, 50),
-        st.percentile(x, 75),
-        st.max(x)
-    ]
 
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', 1000)
@@ -36,12 +23,6 @@ except:
     exit(1)
 
 datasetDF = datasetDF.select_dtypes(include=[int, float])
-statsDF = pd.DataFrame(index=['Count', 'Mean', 'Std', 'Min', '25%', '50%', '75%', 'Max'])
 
-for column in datasetDF:
-    statsDF[column] = getStats(datasetDF[column])
-
-if args.f:
-    statsDF.to_csv(args.n)
-else:
-    print(statsDF)
+data = Data(datasetDF)
+data.describe(args.f, args.n)
