@@ -16,7 +16,7 @@ class Feature():
     def filter_series(self):
         self.series = pd.Series([xi for xi in self.series if not np.isnan(xi)])
 
-    def getStats(self):
+    def get_statistics(self):
         return [
             self.count(),
             self.mean(),
