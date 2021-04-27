@@ -6,7 +6,6 @@ from data import Data
 
 parser = argparse.ArgumentParser()
 parser.add_argument("filename", type=str)
-parser.add_argument("--all", "-a", help="plot histograms for all features (descending homogeneity order)", action='store_true')
 
 args = parser.parse_args()
 
@@ -17,9 +16,4 @@ except:
     exit(1)
 
 data = Data(datasetDF)
-result = data.find_most_homogeneous(all=args.all)
-
-if args.all:
-    data.histogram_all(result)
-else:
-    data.histogram_one(result)
+data.pair_plot()

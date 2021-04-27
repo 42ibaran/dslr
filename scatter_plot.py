@@ -16,5 +16,5 @@ except:
     exit(1)
 
 data = Data(datasetDF)
-x, y = data.find_most_similar()
-data.scatter_plot(x, y)
+feat1, feat2 = data.find_most_similar()
+data.scatter_plot(feat1, feat2)

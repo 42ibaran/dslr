@@ -12,7 +12,7 @@ class Feature():
     def __init__(self, series):
         self.series = series
         self.filter_series()
-        self.standardize()
+        # self.standardize()
 
     def standardize(self):
         self.mean_denorm = self.mean()
