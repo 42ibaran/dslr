@@ -21,7 +21,7 @@ class Data():
     def __init__(self, dataframe):
         self.dataframe = dataframe
 
-    def get_numeric_columns(self):
+    def __get_numeric_columns(self):
         return self.dataframe.select_dtypes(include=[int, float])
 
     def describe(self, toFile=False, filename=None):
@@ -37,7 +37,7 @@ class Data():
             print(statsDF)
 
     def find_most_homogeneous(self, all=False):
-        tmpDF = self.get_numeric_columns()
+        tmpDF = self.__get_numeric_columns()
         homogeneity_dict = {}
 
         for column in tmpDF:
@@ -49,7 +49,7 @@ class Data():
 
     # TODO: replace stats with custom methods?
     def find_most_similar(self):
-        tmpDF = self.get_numeric_columns()
+        tmpDF = self.__get_numeric_columns()
         p_dict = {}
         i = 0
 
