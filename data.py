@@ -85,8 +85,8 @@ class Data():
         plt.show()
 
     def pair_plot(self):
-        log.info("It might take a while, please wait.")
-        sns.pairplot(self.dataframe,
+        log.info("Creating a pair plot. It might take a while, please wait.")
+        sns.pairplot(self.dataframe, corner=True,
                     diag_kind = 'hist', diag_kws = {'bins':25, 'multiple':'stack'},
                     hue=GROUP_BY, palette=HOUSE_COLORS_DICT)
         plt.subplots_adjust(bottom=0.04)
