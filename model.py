@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 
 COLUMN_Y = 'Hogwarts House'
-COLUMNS_X = ['Herbology', 'Defense Against the Dark Arts', 'Divination', 'History of Magic']
+# COLUMNS_X = ['Herbology', 'Defense Against the Dark Arts', 'Divination', 'History of Magic']
 
 TRAIN_ITER = 1000
 LEARNING_RATE = 0.01
@@ -13,63 +13,70 @@ class Model():
     thetas = None
 
     def __init__(self, df):
-        self.x = df[COLUMNS_X]
-        # self.houses = df[COLUMN_Y].astype("category")
-        # self.y = pd.DataFrame()
+        self.x = df.select_dtypes(include=[int, float])
+        self.n_features = self.x.shape[1]
+        self.classes = pd.DataFrame(columns=['high_level', 'low_level'])
+        self.y = df[COLUMN_Y].astype("category")
+        self.classes.high_level = self.y.unique()
         self.y = df[COLUMN_Y].astype('category').cat.codes
+        self.classes.low_level = self.y.unique()
+        self.n_classes = len(self.classes)
         self.m = self.x.shape[0]
-        self.n_classes = len(self.y.unique())
-        self.guess = np.zeros([self.m, self.n_classes])
-        # self.guess = pd.DataFrame(self.guess)
+        self.thetas = np.zeros([self.x.shape[1] + 1, self.n_classes])
+        self.one_hot_encoded = self.__one_hot_encode()
 
-        for i in range(0, self.n_classes):
-            for j in range(0, self.m):
-                if self.y[j] == self.y.unique()[i]:
-                    # self.guess.iloc[j, i] = 1
-                    self.guess[j, i] = 1
-                else:
-                    # self.guess.iloc[j, i] = 0
-                    self.guess[j, i] = 0
+        # print(self.thetas)
+        # print(self.class_matrix)
+        # print(self.classes)
 
-        print(self.guess)
+        self.__normalize()
+        self.x = pd.concat([pd.Series(np.ones(self.m)), self.x], axis=1)
+        print(self.one_hot_encoded)
 
-
-        # print(self.n_classes)
+        self.fit()
+        # self.fit()
         # print(self.houses)
         # print(self.x.shape[0])
         # print(self.x.T)
         # print(pd.concat([self.y, self.x], axis=1))
-        # self.thetas = np.zeros(len(COLUMNS_X))
         # self._normalize()
 
-    # def _normalize_feature(self, column):
-        # self.normalization = pd.DataFrame(index=['std', 'mean'])
-        # std = self.x[column].std()
-        # mean = self.x[column].mean()
-        # self.x[column] = (self.x[column] - mean) / std
-        # self.normalization[column] = [std, mean]
-
-    def _normalize(self):
+    def __normalize(self):
         self.normalization = pd.DataFrame(index=['std', 'mean'])
         x_norm = pd.DataFrame()
         for column in self.x:
-            # self._normalize_feature(column)
             std = self.x[column].std()
             mean = self.x[column].mean()
             x_norm[column] = (self.x[column] - mean) / std
             self.normalization[column] = [std, mean]
         self.x = x_norm
-        # print(pd.concat([self.y, self.x], axis=1))
 
-    def cost(self):
-        guess = self.hypothesis(self.x)
-        return (-1 / self.m) * (self.y * np.log(guess) + (1 - y) * np.log(1 - guess)).sum()
+    def __one_hot_encode(self):
+        one_hot_encoded = np.zeros([self.m, self.n_classes])
+
+        for i in range(0, self.n_classes):
+            for j in range(0, self.m):
+                if self.y[j] == i:
+                    one_hot_encoded[j, i] = 1
+        return one_hot_encoded
+        # self.class_matrix = pd.DataFrame(self.class_matrix)
+
+    # def softmax(self):
+    #     self.x = np.exp(self.x) / np.sum(np.exp(self.x))
 
     def hypothesis(self, x):
-        return 1 / (1 + np.exp(-np.dot(self.thetas, x)))
+        return 1 / (1 + np.exp(np.dot(-x, self.thetas)))
 
-    # def fit(self):
-    #     for _ in range(TRAIN_ITER):
-    #         for _ in range(self.n_classes):
+    def cost(self, x, y):
+        guess = self.hypothesis(x)
+        return (-1 / self.m) * (y * np.log(guess) + (1 - y) * np.log(1 - guess)).sum()
 
-    #     return
+    def fit(self):
+        print(self.thetas)
+        for _ in range(TRAIN_ITER):
+            cost = self.cost(self.x, self.y)
+            print(cost)
+            exit(0)
+            # for i in range(self.n_features):
+                # self.thetas[i] -= (LEARNING_RATE / self.m) * (self.cost(self.x, self.y) - self.y).sum() * self.x[i]
+        print(self.thetas)
