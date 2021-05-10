@@ -1,18 +1,35 @@
 import pandas as pd
 import numpy as np
+import pickle as pk
+
+from logger import *
 
 COLUMN_Y = 'Hogwarts House'
 # COLUMNS_X = ['Herbology', 'Defense Against the Dark Arts', 'Divination', 'History of Magic']
 
 TRAIN_ITER = 1000
 LEARNING_RATE = 0.01
+PICKLE_FILENAME = 'logreg_train.pk'
+
+MODE_TRAIN = 1
+MODE_PREDICT = 2
 
 class Model():
     x = None
     y = None
     thetas = None
 
-    def __init__(self, df):
+    def __init__(self, df, mode=MODE_TRAIN):
+        if mode == MODE_TRAIN:
+            self.__init_for_train(df)
+        elif mode == MODE_PREDICT:
+            self.__init_for_predict(df)
+        else:
+            raise Exception("Wrong model initialization mode.")
+
+
+    def __init_for_train(self, df):
+        df = df.dropna().reset_index()
         self.x = df.select_dtypes(include=[int, float])
         self.n_features = self.x.shape[1]
         self.classes = pd.DataFrame(columns=['high_level', 'low_level'])
@@ -24,22 +41,20 @@ class Model():
         self.m = self.x.shape[0]
         self.thetas = np.zeros([self.x.shape[1] + 1, self.n_classes])
         self.one_hot_encoded = self.__one_hot_encode()
-
-        # print(self.thetas)
-        # print(self.class_matrix)
-        # print(self.classes)
-
         self.__normalize()
         self.x = pd.concat([pd.Series(np.ones(self.m)), self.x], axis=1)
-        print(self.one_hot_encoded)
-
-        self.fit()
-        # self.fit()
-        # print(self.houses)
-        # print(self.x.shape[0])
-        # print(self.x.T)
-        # print(pd.concat([self.y, self.x], axis=1))
-        # self._normalize()
+    
+    def __init_for_predict(self, df):
+        self.load()
+        df = df.select_dtypes(include=[int, float]).reset_index().fillna(0)
+        x_norm = pd.DataFrame()
+        for column in df:
+            mean = self.normalization[column]['mean']
+            std = self.normalization[column]['std']
+            x_norm[column] = (df[column] - mean) / std
+        self.x = x_norm
+        self.x = pd.concat([pd.Series(np.ones(self.x.shape[0])), self.x], axis=1)
+        return
 
     def __normalize(self):
         self.normalization = pd.DataFrame(index=['std', 'mean'])
@@ -65,18 +80,59 @@ class Model():
     #     self.x = np.exp(self.x) / np.sum(np.exp(self.x))
 
     def hypothesis(self, x):
-        return 1 / (1 + np.exp(np.dot(-x, self.thetas)))
+        return 1 / (1 + np.exp(-np.dot(x, self.thetas)))
 
     def cost(self, x, y):
         guess = self.hypothesis(x)
-        return (-1 / self.m) * (y * np.log(guess) + (1 - y) * np.log(1 - guess)).sum()
+        ones = np.ones(y.shape)
+
+        return (-1 / self.m) * np.sum((y * np.log(guess) + (ones - y) * np.log(ones - guess)))
+        # cost_matrix = np.array([0.0, 0.0, 0.0, 0.0])
+
+        # for i in range(y.shape[1]):
+        #     cost_matrix[i] = (-1 / self.m) * np.sum((y * np.log(guess[i]) + (ones - y) * np.log(ones[i] - guess[i])))
+
+        # # print(cost_matrix)
+        # return cost_matrix
+
 
     def fit(self):
-        print(self.thetas)
         for _ in range(TRAIN_ITER):
-            cost = self.cost(self.x, self.y)
-            print(cost)
-            exit(0)
-            # for i in range(self.n_features):
-                # self.thetas[i] -= (LEARNING_RATE / self.m) * (self.cost(self.x, self.y) - self.y).sum() * self.x[i]
+            guess = self.hypothesis(self.x)
+            gradient = np.dot(self.x.T, guess - self.one_hot_encoded) / self.m
+            self.thetas -= LEARNING_RATE * gradient
+            # cost = self.cost(self.x, self.one_hot_encoded)
         print(self.thetas)
+
+    def predict(self):
+        prediction = self.hypothesis(self.x)
+        toto = np.argmax(prediction, axis=1)
+        resList = []
+        for i in toto:
+            house = self.classes['high_level'][i]
+            resList.append(house)
+        resDF = pd.DataFrame(resList, columns=[COLUMN_Y])
+        resDF.index.name = 'Index'
+        resDF.to_csv('prediction.csv')
+
+    def load(self):
+        with open(PICKLE_FILENAME, "rb") as fi:
+            try:
+                obj = pk.load(fi)
+                self.thetas = obj['thetas']
+                self.normalization = obj['normalization']
+                self.classes = obj['classes']
+                self.classes = self.classes.set_index('low_level')
+            except:
+                log.error("Binary file (%s) is invalid." % PICKLE_FILENAME)
+                exit(1)
+
+    def save(self):
+        obj = {
+            'thetas': self.thetas,
+            'normalization': self.normalization,
+            'classes': self.classes
+        }
+        with open(PICKLE_FILENAME, "wb") as fi:
+            pk.dump(obj, fi)
+            log.info("Training result saved successfully.")

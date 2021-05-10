@@ -2,10 +2,11 @@ import argparse
 import pandas as pd
 
 from logger import *
-from model import Model
+from model import Model, MODE_PREDICT
 
 parser = argparse.ArgumentParser()
 parser.add_argument("filename", type=str)
+parser.add_argument("--test", "-t", type=str)
 
 args = parser.parse_args()
 
@@ -15,6 +16,5 @@ except:
     log.error("Data file (%s) not found or invalid csv file." % args.filename)
     exit(1)
 
-model = Model(df=datasetDF)
-model.fit()
-model.save()
+model = Model(datasetDF, mode=MODE_PREDICT)
+model.predict()
