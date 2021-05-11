@@ -1,14 +1,16 @@
 import pandas as pd
 import numpy as np
-import pickle as pk
+import json
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 from logger import *
 
-TRAIN_ITER = 1000
+EPOCHS = 1000
 LEARNING_RATE = 0.01
 
 COLUMN_Y = 'Hogwarts House'
-PICKLE_FILENAME = 'logreg_train.pk'
+PICKLE_FILENAME = 'logreg_train.json'
 PREDICTION_FILENAME = 'houses.csv'
 
 MODE_TRAIN = 1
@@ -18,17 +20,32 @@ class Model():
     x = None
     y = None
     thetas = None
+    features = None
+    config = {
+        'epochs': EPOCHS,
+        'learning_rate': LEARNING_RATE,
+        'cost_evolution': False
+    }
+    cost_evolution = []
 
-    def __init__(self, df, mode=MODE_TRAIN):
+    def __init__(self, df, features=None, mode=MODE_TRAIN):
         if mode == MODE_TRAIN:
-            self.__init_for_train(df)
+            self.__init_for_train(df, features)
         elif mode == MODE_PREDICT:
             self.__init_for_predict(df)
         else:
-            raise Exception("Wrong model initialization mode.")
+            raise Exception("Invalid model initialization mode.")
 
 
-    def __init_for_train(self, df):
+    def __init_for_train(self, df, features):
+        if features is not None:
+            self.features = features
+            features.append(COLUMN_Y)
+            try:
+                df = df[features]
+            except KeyError:
+                raise Exception("One or more training features you've provided are not in the dataset.")
+            features.remove(COLUMN_Y)
         df = df.dropna().reset_index()
         self.x = df.select_dtypes(include=[int, float])
         self.n_features = self.x.shape[1]
@@ -46,6 +63,7 @@ class Model():
     
     def __init_for_predict(self, df):
         self.load()
+        df = df[self.features]
         df = df.select_dtypes(include=[int, float]).reset_index().fillna(0)
         x_norm = pd.DataFrame()
         for column in df:
@@ -54,7 +72,6 @@ class Model():
             x_norm[column] = (df[column] - mean) / std
         self.x = x_norm
         self.x = pd.concat([pd.Series(np.ones(self.x.shape[0])), self.x], axis=1)
-        return
 
     def __normalize(self):
         self.normalization = pd.DataFrame(index=['std', 'mean'])
@@ -75,23 +92,36 @@ class Model():
                     one_hot_encoded[j, i] = 1
         return one_hot_encoded
 
-    def set_training_features(self, features):
-        
-        return
+    def configure(self, config):
+        for key in self.config.keys():
+            if key in config and config[key] is not None:
+                self.config[key] = config[key]
 
     def hypothesis(self, x):
         return 1 / (1 + np.exp(-np.dot(x, self.thetas)))
 
-    def cost(self, x, y):
-        guess = self.hypothesis(x)
-        ones = np.ones(y.shape)
-        return (-1 / self.m) * np.sum((y * np.log(guess) + (ones - y) * np.log(ones - guess)))
+    def cost(self, guess):
+        ones = np.ones(self.one_hot_encoded.shape)
+        return (-1 / self.m) * np.sum((self.one_hot_encoded * np.log(guess) + (ones - self.one_hot_encoded) * np.log(ones - guess)))
+
+    def record_cost_evolution(self, cost):
+        if self.config['cost_evolution']:
+            self.cost_evolution.append(cost)
+
+    def display_cost_evolution(self):
+        if not self.config['cost_evolution']:
+            return
+        ax = sns.lineplot(x=range(self.config['epochs']), y=self.cost_evolution)
+        ax.set(xlabel='Epochs', ylabel='Cost')
+        plt.show()
 
     def fit(self):
-        for _ in range(TRAIN_ITER):
+        for _ in range(self.config['epochs']):
             guess = self.hypothesis(self.x)
+            self.record_cost_evolution(self.cost(guess))
             gradient = np.dot(self.x.T, guess - self.one_hot_encoded) / self.m
-            self.thetas -= LEARNING_RATE * gradient
+            self.thetas -= self.config['learning_rate'] * gradient
+        self.display_cost_evolution()
 
     def predict(self):
         prediction = self.hypothesis(self.x)
@@ -104,23 +134,49 @@ class Model():
         resDF.to_csv(PREDICTION_FILENAME)
 
     def load(self):
-        with open(PICKLE_FILENAME, "rb") as fi:
+        with open(PICKLE_FILENAME, "r") as fi:
             try:
-                obj = pk.load(fi)
-                self.thetas = obj['thetas']
-                self.normalization = obj['normalization']
-                self.classes = obj['classes']
+                obj = json.load(fi)
+                self.thetas = np.array(obj['thetas'])
+                self.normalization = pd.DataFrame(obj['normalization'])
+                self.classes = pd.DataFrame(obj['classes'])
                 self.classes = self.classes.set_index('low_level')
+                self.features = obj['features']
             except:
                 log.error("Binary file (%s) is invalid." % PICKLE_FILENAME)
                 exit(1)
 
     def save(self):
         obj = {
-            'thetas': self.thetas,
-            'normalization': self.normalization,
-            'classes': self.classes
+            'thetas': self.thetas.tolist(),
+            'normalization': self.normalization.to_dict(),
+            'classes': self.classes.to_dict(),
+            'features': self.features
         }
-        with open(PICKLE_FILENAME, "wb") as fi:
-            pk.dump(obj, fi)
+        with open(PICKLE_FILENAME, "w") as fi:
+            json.dump(obj, fi, indent=4)
             log.info("Training result saved successfully.")
+
+    def test(self, filename):
+        try:
+            datasetDF = pd.read_csv(filename, index_col=0)
+            predictedDF = pd.read_csv(PREDICTION_FILENAME, index_col=0)
+        except:
+            log.error("One or both of files are not found or invalid csv file(s).")
+            exit(1)
+
+        datasetDF = datasetDF.reset_index()
+        datasetDF = datasetDF[COLUMN_Y]
+        predictedDF = predictedDF[COLUMN_Y]
+
+        if datasetDF.shape[0] != predictedDF.shape[0]:
+            log.error("Datasets are not same length.")
+            exit(1)
+
+        same = 0
+        for index, house in enumerate(datasetDF):
+            if house == predictedDF[index]:
+                same += 1
+
+        accuracy = 100 * same / datasetDF.shape[0]
+        log.info("Accuracy: %.2f%%" % accuracy)

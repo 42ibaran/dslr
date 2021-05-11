@@ -6,7 +6,7 @@ from model import Model, MODE_PREDICT
 
 parser = argparse.ArgumentParser()
 parser.add_argument('filename', type=str)
-parser.add_argument("--test", "-t", type=str)
+parser.add_argument("--test", "-t", action='store_true')
 
 args = parser.parse_args()
 
@@ -18,3 +18,6 @@ except:
 
 model = Model(datasetDF, mode=MODE_PREDICT)
 model.predict()
+
+if args.test:
+    model.test(args.filename)
