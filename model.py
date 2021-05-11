@@ -1,8 +1,8 @@
 import pandas as pd
 import numpy as np
-import json
 import seaborn as sns
 import matplotlib.pyplot as plt
+import json
 
 from logger import *
 
@@ -36,7 +36,6 @@ class Model():
         else:
             raise Exception("Invalid model initialization mode.")
 
-
     def __init_for_train(self, df, features):
         if features is not None:
             self.features = features
@@ -47,7 +46,7 @@ class Model():
                 raise Exception("One or more training features you've provided are not in the dataset.")
             features.remove(COLUMN_Y)
         df = df.dropna().reset_index()
-        self.x = df.select_dtypes(include=[int, float])
+        self.x = df.select_dtypes(include=[int, float]).drop('Index', axis=1)
         self.n_features = self.x.shape[1]
         self.classes = pd.DataFrame(columns=['high_level', 'low_level'])
         self.y = df[COLUMN_Y].astype('category')
@@ -63,8 +62,9 @@ class Model():
     
     def __init_for_predict(self, df):
         self.load()
-        df = df[self.features]
+        df = df[self.features] if self.features else df
         df = df.select_dtypes(include=[int, float]).reset_index().fillna(0)
+        df = df.drop('Index', axis=1)
         x_norm = pd.DataFrame()
         for column in df:
             mean = self.normalization[column]['mean']
