@@ -5,7 +5,7 @@ from logger import *
 from data import Data
 
 parser = argparse.ArgumentParser()
-parser.add_argument("filename", type=str)
+parser.add_argument('filename', type=str)
 parser.add_argument("--all", "-a", help="plot histograms for all features (descending homogeneity order)", action='store_true')
 
 args = parser.parse_args()

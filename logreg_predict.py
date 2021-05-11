@@ -5,7 +5,7 @@ from logger import *
 from model import Model, MODE_PREDICT
 
 parser = argparse.ArgumentParser()
-parser.add_argument("filename", type=str)
+parser.add_argument('filename', type=str)
 parser.add_argument("--test", "-t", type=str)
 
 args = parser.parse_args()

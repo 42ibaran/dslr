@@ -10,9 +10,9 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.width', 1000)
 
 parser = argparse.ArgumentParser()
-parser.add_argument("filename", type=str)
-parser.add_argument("-f", help="Save statistics to file", action='store_true')
-parser.add_argument("-n", help="Name of the file with statistics (see -f)", type=str, default=RESULT_FILENAME)
+parser.add_argument('filename', type=str)
+parser.add_argument('-f', help="Save statistics to file", action='store_true')
+parser.add_argument('-n', help="Name of the file with statistics (see -f)", type=str, default=RESULT_FILENAME)
 
 args = parser.parse_args()
 
