@@ -27,4 +27,3 @@ model = Model(args.filename, {
 })
 
 model.fit()
-model.save()

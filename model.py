@@ -38,7 +38,7 @@ class Model():
     cost_evolution = []
 
     def __init__(self, df_filename, config):
-        self.configure(config)
+        self.__configure(config)
         self.__load_dataset(df_filename)
 
         if self.config['mode'] == MODE_PREDICT:
@@ -148,7 +148,7 @@ class Model():
             self.df_to_predict = self.df_to_predict.reset_index(drop=True)
             self.df_to_train = self.df_to_train.reset_index(drop=True)
 
-    def configure(self, config):
+    def __configure(self, config):
         for key in self.config.keys():
             if key in config and config[key] is not None:
                 self.config[key] = config[key]
@@ -160,11 +160,11 @@ class Model():
         ones = np.ones(self.one_hot_encoded.shape)
         return (-1 / self.m) * np.sum((self.one_hot_encoded * np.log(guess) + (ones - self.one_hot_encoded) * np.log(ones - guess)))
 
-    def record_cost_evolution(self, cost):
+    def __record_cost_evolution(self, cost):
         if self.config['cost_evolution']:
             self.cost_evolution.append(cost)
 
-    def display_cost_evolution(self):
+    def __display_cost_evolution(self):
         if not self.config['cost_evolution']:
             return
         ax = sns.lineplot(x=range(self.config['epochs']), y=self.cost_evolution)
@@ -174,11 +174,12 @@ class Model():
     def fit(self):
         for _ in range(self.config['epochs']):
             guess = self.hypothesis(self.x)
-            self.record_cost_evolution(self.cost(guess))
+            self.__record_cost_evolution(self.cost(guess))
             gradient = np.dot(self.x.T, guess - self.one_hot_encoded) / self.m
             self.thetas -= self.config['learning_rate'] * gradient
-        self.display_cost_evolution()
-        self.test()
+        self.__display_cost_evolution()
+        self.__test()
+        self.__save()
 
     def predict(self):
         prediction = self.hypothesis(self.x)
@@ -205,7 +206,7 @@ class Model():
                 log.error("Binary file (%s) is invalid." % PICKLE_FILENAME)
                 exit(1)
 
-    def save(self):
+    def __save(self):
         obj = {
             'thetas': self.thetas.tolist(),
             'normalization': self.normalization.to_dict(),
@@ -216,7 +217,7 @@ class Model():
             json.dump(obj, fi, indent=4)
             log.info("Training result saved successfully.")
 
-    def test(self):
+    def __test(self):
         if not self.config['test']:
             return
 
