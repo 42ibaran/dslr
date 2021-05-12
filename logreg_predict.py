@@ -16,8 +16,7 @@ except:
     log.error("Data file (%s) not found or invalid csv file." % args.filename)
     exit(1)
 
-model = Model(datasetDF, mode=MODE_PREDICT)
+model = Model(args.filename, {
+    'mode': MODE_PREDICT
+})
 model.predict()
-
-if args.test:
-    model.test(args.filename)

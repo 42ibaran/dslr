@@ -6,7 +6,7 @@ import json
 
 from logger import *
 
-EPOCHS = 1000
+EPOCHS = 2500
 LEARNING_RATE = 0.01
 
 COLUMN_Y = 'Hogwarts House'
@@ -17,63 +17,77 @@ MODE_TRAIN = 1
 MODE_PREDICT = 2
 
 class Model():
+    df_to_train = None
+    df_to_predict = None
+    df_with_prediction = None
+
     x = None
     y = None
     thetas = None
-    features = None
+    
     config = {
+        'mode': MODE_TRAIN,
+        'features': None,
+        'features_select': False,
         'epochs': EPOCHS,
         'learning_rate': LEARNING_RATE,
-        'cost_evolution': False
+        'cost_evolution': False,
+        'test': False,
+        'split_percent': 0.8,
     }
     cost_evolution = []
 
-    def __init__(self, df, features=None, mode=MODE_TRAIN):
-        if mode == MODE_TRAIN:
-            self.__init_for_train(df, features)
-        elif mode == MODE_PREDICT:
-            self.__init_for_predict(df)
+    def __init__(self, df_filename, config):
+        self.configure(config)
+        self.__load_dataset(df_filename)
+
+        if self.config['mode'] == MODE_PREDICT:
+            self.__load_trained_data()
+
+        self.__select_features()
+
+        if self.config['mode'] == MODE_TRAIN:
+            self.__split_dataset()
+            self.__init_for_train()
+        elif self.config['mode'] == MODE_PREDICT:
+            self.__init_for_predict()
         else:
             raise Exception("Invalid model initialization mode.")
 
-    def __init_for_train(self, df, features):
-        if features is not None:
-            self.features = features
-            features.append(COLUMN_Y)
-            try:
-                df = df[features]
-            except KeyError:
-                raise Exception("One or more training features you've provided are not in the dataset.")
-            features.remove(COLUMN_Y)
-        df = df.dropna().reset_index()
-        self.x = df.select_dtypes(include=[int, float]).drop('Index', axis=1)
-        self.n_features = self.x.shape[1]
+    def __init_for_train(self):
+        self.df_to_train = self.df_to_train.dropna().reset_index(drop=True)
+        self.x = self.df_to_train.select_dtypes(include=[int, float])
+
         self.classes = pd.DataFrame(columns=['high_level', 'low_level'])
-        self.y = df[COLUMN_Y].astype('category')
+        self.y = self.df_to_train[COLUMN_Y].astype('category')
         self.classes.high_level = self.y.unique()
-        self.y = df[COLUMN_Y].astype('category').cat.codes
+        self.y = self.df_to_train[COLUMN_Y].astype('category').cat.codes
         self.classes.low_level = self.y.unique()
+        self.classes = self.classes.set_index('low_level')
+    
+        self.n_features = self.x.shape[1]
         self.n_classes = len(self.classes)
         self.m = self.x.shape[0]
         self.thetas = np.zeros([self.x.shape[1] + 1, self.n_classes])
-        self.one_hot_encoded = self.__one_hot_encode()
-        self.__normalize()
+
+        self.__one_hot_encode()
+        self.__normalize_before_training()
+
         self.x = pd.concat([pd.Series(np.ones(self.m)), self.x], axis=1)
     
-    def __init_for_predict(self, df):
-        self.load()
-        df = df[self.features] if self.features else df
-        df = df.select_dtypes(include=[int, float]).reset_index().fillna(0)
-        df = df.drop('Index', axis=1)
-        x_norm = pd.DataFrame()
-        for column in df:
-            mean = self.normalization[column]['mean']
-            std = self.normalization[column]['std']
-            x_norm[column] = (df[column] - mean) / std
-        self.x = x_norm
+    def __init_for_predict(self):
+        if self.config['mode'] == MODE_PREDICT:
+            self.__load_trained_data()
+        else:
+            self.df_with_right_prediction = self.df_to_predict[COLUMN_Y]
+
+        self.df_to_predict = self.df_to_predict.fillna(0)
+        self.df_to_predict = self.df_to_predict.select_dtypes(include=[int, float])
+        
+        self.__normalize_before_prediction()
         self.x = pd.concat([pd.Series(np.ones(self.x.shape[0])), self.x], axis=1)
 
-    def __normalize(self):
+    def __normalize_before_training(self):
         self.normalization = pd.DataFrame(index=['std', 'mean'])
         x_norm = pd.DataFrame()
         for column in self.x:
@@ -83,14 +97,56 @@ class Model():
             self.normalization[column] = [std, mean]
         self.x = x_norm
 
+    def __normalize_before_prediction(self):
+        x_norm = pd.DataFrame()
+        for column in self.df_to_predict:
+            mean = self.normalization[column]['mean']
+            std = self.normalization[column]['std']
+            x_norm[column] = (self.df_to_predict[column] - mean) / std
+        self.x = x_norm
+
     def __one_hot_encode(self):
-        one_hot_encoded = np.zeros([self.m, self.n_classes])
+        self.one_hot_encoded = np.zeros([self.m, self.n_classes])
 
         for i in range(0, self.n_classes):
             for j in range(0, self.m):
                 if self.y[j] == i:
-                    one_hot_encoded[j, i] = 1
-        return one_hot_encoded
+                    self.one_hot_encoded[j, i] = 1
+
+    def __load_dataset(self, df_filename):
+        try:
+            df = pd.read_csv(df_filename, index_col=0)
+        except:
+            raise Exception("Data file (%s) not found or invalid csv file." % df_filename)
+        
+        if self.config['mode'] == MODE_TRAIN:
+            self.df_to_train = df
+        elif self.config['mode'] == MODE_PREDICT:
+            self.df_to_predict = df
+        else:
+            raise Exception("Invalid model initialization mode.")
+
+    def __select_features(self):
+        if self.config['features'] is not None:
+            self.config['features'].append(COLUMN_Y)
+            try:
+                self.df_to_train = self.df_to_train[self.config['features']] if self.df_to_train is not None else self.df_to_train
+                self.df_to_predict = self.df_to_predict[self.config['features']] if self.df_to_predict is not None else self.df_to_predict
+            except KeyError:
+                raise Exception("Failed selecting features from dataset.")
+            self.config['features'].remove(COLUMN_Y)
+
+    def __split_dataset(self):
+        if self.config['split_percent'] < 0.0 or self.config['split_percent'] > 1.0:
+            raise Exception("Invalid dataset split percentage value.")
+
+        if self.config['test']:
+            df_to_train = self.df_to_train.sample(frac=self.config['split_percent'])
+            self.df_to_predict = self.df_to_train.drop(df_to_train.index)
+            self.df_to_train = df_to_train
+            
+            self.df_to_predict = self.df_to_predict.reset_index(drop=True)
+            self.df_to_train = self.df_to_train.reset_index(drop=True)
 
     def configure(self, config):
         for key in self.config.keys():
@@ -122,26 +178,29 @@ class Model():
             gradient = np.dot(self.x.T, guess - self.one_hot_encoded) / self.m
             self.thetas -= self.config['learning_rate'] * gradient
         self.display_cost_evolution()
+        self.test()
 
     def predict(self):
         prediction = self.hypothesis(self.x)
         low_level_classes = np.argmax(prediction, axis=1)
-        resDF = pd.DataFrame(columns=[COLUMN_Y])
+        self.df_with_prediction = pd.DataFrame(columns=[COLUMN_Y])
         for i in low_level_classes:
-            high_level_class = self.classes['high_level'][i]
-            resDF = resDF.append({ COLUMN_Y : high_level_class }, ignore_index=True)
-        resDF.index.name = 'Index'
-        resDF.to_csv(PREDICTION_FILENAME)
+            high_level_class = self.classes.loc[i]['high_level']
+            self.df_with_prediction = self.df_with_prediction.append({ COLUMN_Y : high_level_class }, ignore_index=True)
+        self.df_with_prediction.index.name = 'Index'
+        if self.config['mode'] == MODE_PREDICT:
+            self.df_with_prediction.to_csv(PREDICTION_FILENAME)
+        elif self.config['mode'] != MODE_TRAIN:
+            raise Exception("Invalid model initialization mode.")
 
-    def load(self):
+    def __load_trained_data(self):
         with open(PICKLE_FILENAME, "r") as fi:
             try:
                 obj = json.load(fi)
                 self.thetas = np.array(obj['thetas'])
                 self.normalization = pd.DataFrame(obj['normalization'])
                 self.classes = pd.DataFrame(obj['classes'])
-                self.classes = self.classes.set_index('low_level')
-                self.features = obj['features']
+                self.config['features'] = obj['features']
             except:
                 log.error("Binary file (%s) is invalid." % PICKLE_FILENAME)
                 exit(1)
@@ -151,32 +210,41 @@ class Model():
             'thetas': self.thetas.tolist(),
             'normalization': self.normalization.to_dict(),
             'classes': self.classes.to_dict(),
-            'features': self.features
+            'features': self.config['features']
         }
         with open(PICKLE_FILENAME, "w") as fi:
             json.dump(obj, fi, indent=4)
             log.info("Training result saved successfully.")
 
-    def test(self, filename):
-        try:
-            datasetDF = pd.read_csv(filename, index_col=0)
-            predictedDF = pd.read_csv(PREDICTION_FILENAME, index_col=0)
-        except:
-            log.error("One or both of files are not found or invalid csv file(s).")
-            exit(1)
+    def test(self):
+        if not self.config['test']:
+            return
 
-        datasetDF = datasetDF.reset_index()
-        datasetDF = datasetDF[COLUMN_Y]
-        predictedDF = predictedDF[COLUMN_Y]
+        self.__init_for_predict()
+        self.predict()
 
-        if datasetDF.shape[0] != predictedDF.shape[0]:
+        if self.df_with_right_prediction.shape[0] != self.df_with_prediction.shape[0]:
             log.error("Datasets are not same length.")
             exit(1)
 
-        same = 0
-        for index, house in enumerate(datasetDF):
-            if house == predictedDF[index]:
-                same += 1
+        columns = ["Positive/Negative"]
+        columns += self.classes['high_level'].tolist()
+        accuracy_df = pd.DataFrame(columns=columns)
+        accuracy_df["Positive/Negative"] = ["True Positive", "True Negative", "False Positive", "False Negative"]
+        accuracy_df = accuracy_df.fillna(0)
+        accuracy_df.set_index("Positive/Negative", inplace=True)
 
-        accuracy = 100 * same / datasetDF.shape[0]
+        self.df_with_prediction = self.df_with_prediction[COLUMN_Y]
+
+        for index, house in enumerate(self.df_with_right_prediction):
+            if self.df_with_prediction[index] == house:
+                accuracy_df[house]["True Positive"] += 1
+                accuracy_df.loc["True Negative", accuracy_df.columns != house] += 1
+            else:
+                accuracy_df[self.df_with_prediction[index]]["False Positive"] += 1
+                accuracy_df[house]["False Negative"] += 1
+        print(accuracy_df)
+        trues = accuracy_df.loc[["True Positive", "True Negative"]].sum().sum()
+        all = accuracy_df.sum().sum()
+        accuracy = 100 * trues / all
         log.info("Accuracy: %.2f%%" % accuracy)
