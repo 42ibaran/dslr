@@ -71,15 +71,15 @@ To train the model run:
 logreg_train.py [-h] [--cost-evolution] [--epochs EPOCHS] [--learning-rate LEARNING_RATE] [--features FEATURES [FEATURES ...]] [--features-select] [--test] [--split-percent SPLIT_PERCENT] [--seed SEED] [--random] filename.csv
 ```
 Optional arguments:
-* ```-c (--cost-evolution): display cost evolution after training```
-* ```-e (--epochs) EPOCHS: number of iterations for training```
-* ```-lr (--learning-rate) LEARNING_RATE: learning rate for training```
-* ```-f (--features) FEATURE [FEATURES ...]: list of features for training```
-* ```-fs (--features-select): display feature selector. -f option will be ignored```
-* ```-t (--test): display accuracy statistics after training. will split provided dataset by Pareto rule```
-* ```-sp (--split-percent) SPLIT_PERCENT: fraction of dataset to be used for training (see --test)```
-* ```-s (--seed) SEED: seed to use for splitting dataset (see --test)```
-* ```-r (--random): randomize dataset split. -s option will be ignored```
+* ```-c (--cost-evolution)``` display cost evolution after training
+* ```-e (--epochs) EPOCHS``` number of iterations for training
+* ```-lr (--learning-rate) LEARNING_RATE``` learning rate for training
+* ```-f (--features) FEATURE [FEATURES ...]``` list of features for training
+* ```-fs (--features-select)``` display feature selector. -f option will be ignored
+* ```-t (--test)``` display accuracy statistics after training. will split provided dataset by Pareto rule
+* ```-sp (--split-percent) SPLIT_PERCENT``` fraction of dataset to be used for training (see --test)
+* ```-s (--seed) SEED``` seed to use for splitting dataset (see --test)
+* ```-r (--random)``` randomize dataset split. -s option will be ignored
 
 After training is complete, `logreg_train.json` is created with data necessary for prediction.
 
