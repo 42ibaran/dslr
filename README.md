@@ -79,7 +79,7 @@ Optional arguments:
 * ```-t (--test)``` display accuracy statistics after training. will split provided dataset by Pareto rule
 * ```-sp (--split-percent) SPLIT_PERCENT``` fraction of dataset to be used for training (see --test)
 * ```-s (--seed) SEED``` seed to use for splitting dataset (see --test)
-* ```-r (--random)``` randomize dataset split. -s option will be ignored
+* ```-v (--verbose) VERBOSE``` verbose level
 
 After training is complete, `logreg_train.json` is created with data necessary for prediction.
 
