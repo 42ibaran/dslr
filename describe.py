@@ -11,8 +11,8 @@ pd.set_option('display.width', 1000)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('filename', type=str)
-parser.add_argument('-f', help="Save statistics to file", action='store_true')
-parser.add_argument('-n', help="Name of the file with statistics (see -f)", type=str, default=RESULT_FILENAME)
+parser.add_argument('--to-file', '-tf', help="Save statistics to file", action='store_true')
+parser.add_argument('--output-filename', '-of', help="Name of the file with statistics (see -f)", type=str, default=RESULT_FILENAME)
 
 args = parser.parse_args()
 
@@ -25,4 +25,4 @@ except:
 datasetDF = datasetDF.select_dtypes(include=[int, float])
 
 data = Data(datasetDF)
-data.describe(args.f, args.n)
+data.describe(args.to_file, args.output_filename)

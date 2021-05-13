@@ -6,10 +6,12 @@ import json
 
 from logger import *
 
-EPOCHS = 2500
-LEARNING_RATE = 0.01
+DEFAULT_EPOCHS = 2500
+DEFAULT_LEARNING_RATE = 0.01
+DEFAULT_SPLIT_PERCENT = 0.8
+DEFAULT_SEED = 42424242
 
-COLUMN_Y = 'Hogwarts House'
+COLUMN_WITH_CLASSES = 'Hogwarts House'
 PICKLE_FILENAME = 'logreg_train.json'
 PREDICTION_FILENAME = 'houses.csv'
 
@@ -19,27 +21,32 @@ MODE_PREDICT = 2
 class Model():
     df_to_train = None
     df_to_predict = None
-    df_with_prediction = None
+    df_model_classes = None
 
     x = None
     y = None
     thetas = None
+    cost_evolution = []
     
     config = {
         'mode': MODE_TRAIN,
         'features': None,
         'features_select': False,
-        'epochs': EPOCHS,
-        'learning_rate': LEARNING_RATE,
+        'epochs': DEFAULT_EPOCHS,
+        'learning_rate': DEFAULT_LEARNING_RATE,
         'cost_evolution': False,
         'test': False,
-        'split_percent': 0.8,
+        'split_percent': DEFAULT_SPLIT_PERCENT,
+        'seed': DEFAULT_SEED,
+        'random': False
     }
-    cost_evolution = []
 
     def __init__(self, df_filename, config):
         self.__configure(config)
         self.__load_dataset(df_filename)
+
+        if self.config['mode'] == MODE_TRAIN and self.config['features_select']:
+            self.__prompt_feature_selector()
 
         if self.config['mode'] == MODE_PREDICT:
             self.__load_trained_data()
@@ -58,12 +65,12 @@ class Model():
         self.df_to_train = self.df_to_train.dropna().reset_index(drop=True)
         self.x = self.df_to_train.select_dtypes(include=[int, float])
 
-        self.classes = pd.DataFrame(columns=['high_level', 'low_level'])
-        self.y = self.df_to_train[COLUMN_Y].astype('category')
-        self.classes.high_level = self.y.unique()
-        self.y = self.df_to_train[COLUMN_Y].astype('category').cat.codes
-        self.classes.low_level = self.y.unique()
-        self.classes = self.classes.set_index('low_level')
+        self.classes = {}
+        self.y = self.df_to_train[COLUMN_WITH_CLASSES].astype('category')
+        classes_high_level = self.y.unique()
+        classes_low_level = self.y.cat.codes.unique()
+        self.classes = { int(classes_low_level[i]): classes_high_level[i] for i in range(len(classes_low_level)) }
+        self.y = self.y.cat.codes
     
         self.n_features = self.x.shape[1]
         self.n_classes = len(self.classes)
@@ -79,7 +86,7 @@ class Model():
         if self.config['mode'] == MODE_PREDICT:
             self.__load_trained_data()
         else:
-            self.df_with_right_prediction = self.df_to_predict[COLUMN_Y]
+            self.df_correct_classes = self.df_to_predict[COLUMN_WITH_CLASSES]
 
         self.df_to_predict = self.df_to_predict.fillna(0)
         self.df_to_predict = self.df_to_predict.select_dtypes(include=[int, float])
@@ -99,7 +106,7 @@ class Model():
 
     def __normalize_before_prediction(self):
         x_norm = pd.DataFrame()
-        for column in self.df_to_predict:
+        for column in self.normalization:
             mean = self.normalization[column]['mean']
             std = self.normalization[column]['std']
             x_norm[column] = (self.df_to_predict[column] - mean) / std
@@ -126,22 +133,57 @@ class Model():
         else:
             raise Exception("Invalid model initialization mode.")
 
+    def __prompt_feature_selector(self):
+        numeric_features = self.df_to_train.select_dtypes(include=[int, float]).columns
+        for i in range(len(numeric_features)):
+            print(i + 1, '. ', numeric_features[i], sep="")
+        
+        print("Provide indexes of features you want to use for training (one by one):")
+        indices = []
+        while True:
+            try:
+                user_input = input()
+            except KeyboardInterrupt:
+                break
+            if user_input == "":
+                break
+            try:
+                index = int(user_input)
+                if index < 1 or index > len(numeric_features):
+                    log.warning("Ignoreing invalid value. Press enter to proceed to training.")
+                    continue
+                if index not in indices:
+                    indices.append(index)
+            except ValueError:
+                log.warning("Ignoreing invalid value. Press enter to proceed to training.")        
+        if len(indices) == 0:
+            self.config['features'] = list(numeric_features)
+            return
+        indices = [ i - 1 for i in indices ]
+        try:
+            self.config['features'] = list(numeric_features[indices])
+        except IndexError:
+            raise ValueError("Somehow you f***ed it up.")
+
     def __select_features(self):
         if self.config['features'] is not None:
-            self.config['features'].append(COLUMN_Y)
+            self.config['features'].append(COLUMN_WITH_CLASSES)
             try:
                 self.df_to_train = self.df_to_train[self.config['features']] if self.df_to_train is not None else self.df_to_train
                 self.df_to_predict = self.df_to_predict[self.config['features']] if self.df_to_predict is not None else self.df_to_predict
             except KeyError:
                 raise Exception("Failed selecting features from dataset.")
-            self.config['features'].remove(COLUMN_Y)
+            self.config['features'].remove(COLUMN_WITH_CLASSES)
 
     def __split_dataset(self):
         if self.config['split_percent'] < 0.0 or self.config['split_percent'] > 1.0:
             raise Exception("Invalid dataset split percentage value.")
 
+        if self.config['random']:
+            self.config['seed'] = np.random.seed()
+
         if self.config['test']:
-            df_to_train = self.df_to_train.sample(frac=self.config['split_percent'])
+            df_to_train = self.df_to_train.sample(frac=self.config['split_percent'], random_state=self.config['seed'])
             self.df_to_predict = self.df_to_train.drop(df_to_train.index)
             self.df_to_train = df_to_train
             
@@ -152,13 +194,6 @@ class Model():
         for key in self.config.keys():
             if key in config and config[key] is not None:
                 self.config[key] = config[key]
-
-    def hypothesis(self, x):
-        return 1 / (1 + np.exp(-np.dot(x, self.thetas)))
-
-    def cost(self, guess):
-        ones = np.ones(self.one_hot_encoded.shape)
-        return (-1 / self.m) * np.sum((self.one_hot_encoded * np.log(guess) + (ones - self.one_hot_encoded) * np.log(ones - guess)))
 
     def __record_cost_evolution(self, cost):
         if self.config['cost_evolution']:
@@ -171,36 +206,13 @@ class Model():
         ax.set(xlabel='Epochs', ylabel='Cost')
         plt.show()
 
-    def fit(self):
-        for _ in range(self.config['epochs']):
-            guess = self.hypothesis(self.x)
-            self.__record_cost_evolution(self.cost(guess))
-            gradient = np.dot(self.x.T, guess - self.one_hot_encoded) / self.m
-            self.thetas -= self.config['learning_rate'] * gradient
-        self.__display_cost_evolution()
-        self.__test()
-        self.__save()
-
-    def predict(self):
-        prediction = self.hypothesis(self.x)
-        low_level_classes = np.argmax(prediction, axis=1)
-        self.df_with_prediction = pd.DataFrame(columns=[COLUMN_Y])
-        for i in low_level_classes:
-            high_level_class = self.classes.loc[i]['high_level']
-            self.df_with_prediction = self.df_with_prediction.append({ COLUMN_Y : high_level_class }, ignore_index=True)
-        self.df_with_prediction.index.name = 'Index'
-        if self.config['mode'] == MODE_PREDICT:
-            self.df_with_prediction.to_csv(PREDICTION_FILENAME)
-        elif self.config['mode'] != MODE_TRAIN:
-            raise Exception("Invalid model initialization mode.")
-
     def __load_trained_data(self):
         with open(PICKLE_FILENAME, "r") as fi:
             try:
                 obj = json.load(fi)
                 self.thetas = np.array(obj['thetas'])
                 self.normalization = pd.DataFrame(obj['normalization'])
-                self.classes = pd.DataFrame(obj['classes'])
+                self.classes = { int(k): v for k, v in obj['classes'].items() }
                 self.config['features'] = obj['features']
             except:
                 log.error("Binary file (%s) is invalid." % PICKLE_FILENAME)
@@ -210,7 +222,7 @@ class Model():
         obj = {
             'thetas': self.thetas.tolist(),
             'normalization': self.normalization.to_dict(),
-            'classes': self.classes.to_dict(),
+            'classes': self.classes,
             'features': self.config['features']
         }
         with open(PICKLE_FILENAME, "w") as fi:
@@ -224,28 +236,58 @@ class Model():
         self.__init_for_predict()
         self.predict()
 
-        if self.df_with_right_prediction.shape[0] != self.df_with_prediction.shape[0]:
-            log.error("Datasets are not same length.")
-            exit(1)
+        if self.df_correct_classes.shape[0] != self.df_model_classes.shape[0]:
+            raise Exception("Datasets are not same length.")
 
         columns = ["Positive/Negative"]
-        columns += self.classes['high_level'].tolist()
-        accuracy_df = pd.DataFrame(columns=columns)
-        accuracy_df["Positive/Negative"] = ["True Positive", "True Negative", "False Positive", "False Negative"]
-        accuracy_df = accuracy_df.fillna(0)
-        accuracy_df.set_index("Positive/Negative", inplace=True)
+        columns += self.classes.values()
+        df_accuracy = pd.DataFrame(columns=columns)
+        df_accuracy["Positive/Negative"] = ["True Positive", "True Negative", "False Positive", "False Negative"]
+        df_accuracy = df_accuracy.fillna(0)
+        df_accuracy.set_index("Positive/Negative", inplace=True)
 
-        self.df_with_prediction = self.df_with_prediction[COLUMN_Y]
+        self.df_model_classes = self.df_model_classes[COLUMN_WITH_CLASSES]
 
-        for index, house in enumerate(self.df_with_right_prediction):
-            if self.df_with_prediction[index] == house:
-                accuracy_df[house]["True Positive"] += 1
-                accuracy_df.loc["True Negative", accuracy_df.columns != house] += 1
+        for index, correct_class in enumerate(self.df_correct_classes):
+            if self.df_model_classes[index] == correct_class:
+                df_accuracy[correct_class]["True Positive"] += 1
+                df_accuracy.loc["True Negative", df_accuracy.columns != correct_class] += 1
             else:
-                accuracy_df[self.df_with_prediction[index]]["False Positive"] += 1
-                accuracy_df[house]["False Negative"] += 1
-        print(accuracy_df)
-        trues = accuracy_df.loc[["True Positive", "True Negative"]].sum().sum()
-        all = accuracy_df.sum().sum()
+                df_accuracy[self.df_model_classes[index]]["False Positive"] += 1
+                df_accuracy[correct_class]["False Negative"] += 1
+        log.info("Accuracy table:")
+        print(df_accuracy)
+        trues = df_accuracy.loc[["True Positive", "True Negative"]].sum().sum()
+        all = df_accuracy.sum().sum()
         accuracy = 100 * trues / all
         log.info("Accuracy: %.2f%%" % accuracy)
+
+    def __hypothesis(self, x):
+        return 1 / (1 + np.exp(-np.dot(x, self.thetas)))
+
+    def __cost(self, guess):
+        ones = np.ones(self.one_hot_encoded.shape)
+        return (-1 / self.m) * np.sum((self.one_hot_encoded * np.log(guess) + (ones - self.one_hot_encoded) * np.log(ones - guess)))
+
+    def fit(self):
+        for _ in range(self.config['epochs']):
+            guess = self.__hypothesis(self.x)
+            self.__record_cost_evolution(self.__cost(guess))
+            gradient = np.dot(self.x.T, guess - self.one_hot_encoded) / self.m
+            self.thetas -= self.config['learning_rate'] * gradient
+        self.__display_cost_evolution()
+        self.__test()
+        self.__save()
+
+    def predict(self):
+        prediction = self.__hypothesis(self.x)
+        low_level_classes = np.argmax(prediction, axis=1)
+        self.df_model_classes = pd.DataFrame(columns=[COLUMN_WITH_CLASSES])
+        for i in low_level_classes:
+            high_level_class = self.classes[i]
+            self.df_model_classes = self.df_model_classes.append({ COLUMN_WITH_CLASSES : high_level_class }, ignore_index=True)
+        self.df_model_classes.index.name = 'Index'
+        if self.config['mode'] == MODE_PREDICT:
+            self.df_model_classes.to_csv(PREDICTION_FILENAME)
+        elif self.config['mode'] != MODE_TRAIN:
+            raise Exception("Invalid model initialization mode.")

@@ -5,25 +5,42 @@ from logger import *
 from model import Model
 
 parser = argparse.ArgumentParser()
-parser.add_argument('filename', type=str)
-parser.add_argument('--cost-evolution', '-c', action='store_true')
-parser.add_argument('--epochs', '-e', type=int)
-parser.add_argument('--learning-rate', '-lr', type=float)
-parser.add_argument('--features', '-f', nargs='+')
-parser.add_argument('--features-select', '-fs', action='store_true') # NOT IMPL
-parser.add_argument('--test', '-t', action='store_true') # NOT IMPL
-parser.add_argument('--split-percent', '-sp', type=float, default=0.8) # NOT IMPL
+parser.add_argument('filename',                 type=str,
+                    help="csv file with dataset for training")
+parser.add_argument('-c',  '--cost-evolution',  action='store_true', 
+                    help="display cost evolution after training")
+parser.add_argument('-e',  '--epochs',          type=int,
+                    help="number of iterations for training")
+parser.add_argument('-lr', '--learning-rate',   type=float,
+                    help="learning rate for training")
+parser.add_argument('-f',  '--features',        nargs='+',
+                    help="list of features for training")
+parser.add_argument('-fs', '--features-select', action='store_true',
+                    help="display feature selector. -f option will be ignored")
+parser.add_argument('-t',  '--test',            action='store_true',
+                    help="display accuracy statistics after training. will split provided dataset by Pareto rule")
+parser.add_argument('-sp', '--split-percent',   type=float, default=0.8,
+                    help="fraction of dataset to be used for training (see --test)")
+parser.add_argument('-s',  '--seed',            type=int,  default=42424242,
+                    help="seed to use for splitting dataset (see --test)")
+parser.add_argument('-r',  '--random',          action='store_true',
+                    help="randomize dataset split. -s option will be ignored")
 
 args = parser.parse_args()
 
-model = Model(args.filename, {
-    'features': args.features,
-    'features_select': args.features_select,
-    'epochs': args.epochs,
-    'learning_rate': args.learning_rate,
-    'cost_evolution': args.cost_evolution,
-    'test': args.test,
-    'split_percent': args.split_percent,
-})
-
-model.fit()
+try:
+    model = Model(args.filename, {
+        'features': args.features,
+        'features_select': args.features_select,
+        'epochs': args.epochs,
+        'learning_rate': args.learning_rate,
+        'cost_evolution': args.cost_evolution,
+        'test': args.test,
+        'split_percent': args.split_percent,
+        'seed': args.seed,
+        'random': args.random
+    })
+    model.fit()
+except Exception as e:
+    log.error(e)
+    exit(1)
