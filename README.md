@@ -88,3 +88,13 @@ To sort students into Hogwarts houses (ain't it what we all are here for?) run:
 python logreg_predict.py datasets/dataset_test.csv
 ```
 File `houses.csv` will be created et voilà!
+
+## Bonuses
+1. Verbose
+2. Integrated model evaluation
+3. Choose epochs, learning rate
+4. Choose seed and dataset split ratio
+5. Display cost evolution
+6. Save describe.py result to file
+7. Docker
+8. Readme
