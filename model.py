@@ -7,8 +7,6 @@ import time
 
 from logger import *
 
-pd.set_option('display.max_columns', 6)
-
 DEFAULT_EPOCHS = 2500
 DEFAULT_LEARNING_RATE = 0.01
 DEFAULT_SPLIT_PERCENT = 0.8
@@ -56,9 +54,11 @@ class Model():
         self.__select_features()
 
         if self.config['mode'] == MODE_TRAIN:
+            self.df_to_train = self.df
             self.__split_dataset()
             self.__init_for_train()
         elif self.config['mode'] == MODE_PREDICT:
+            self.df_to_predict = self.df
             self.__init_for_predict()
         else:
             raise Exception("Invalid model initialization mode.")
@@ -78,19 +78,12 @@ class Model():
 
     def __load_dataset(self, df_filename):
         try:
-            df = pd.read_csv(df_filename, index_col=0)
+            self.df = pd.read_csv(df_filename, index_col=0)
         except:
             raise Exception("Data file (%s) not found or invalid csv file." % df_filename)
-        
-        if self.config['mode'] == MODE_TRAIN:
-            self.df_to_train = df
-        elif self.config['mode'] == MODE_PREDICT:
-            self.df_to_predict = df
-        else:
-            raise Exception("Invalid model initialization mode.")
 
     def __prompt_feature_selector(self):
-        numeric_features = self.df_to_train.select_dtypes(include=[int, float]).columns
+        numeric_features = self.df.select_dtypes(include=[int, float]).columns
         for i in range(len(numeric_features)):
             print(i + 1, '. ', numeric_features[i], sep="")
         
@@ -147,14 +140,14 @@ class Model():
             raise Exception("Failed saving training result.")
 
     def __select_features(self):
-        if self.config['features'] is not None:
+        try:
+            if self.config['features'] is None:
+                self.config['features'] = self.df.select_dtypes(include=[int, float]).columns.tolist()
             self.config['features'].append(COLUMN_WITH_CLASSES)
-            try:
-                self.df_to_train = self.df_to_train[self.config['features']] if self.df_to_train is not None else self.df_to_train
-                self.df_to_predict = self.df_to_predict[self.config['features']] if self.df_to_predict is not None else self.df_to_predict
-            except KeyError:
-                raise Exception("Failed selecting features from dataset.")
+            self.df = self.df[self.config['features']]
             self.config['features'].remove(COLUMN_WITH_CLASSES)
+        except KeyError:
+            raise Exception("Failed selecting features from dataset, did you provide a feature that is not in dataset?")
         self.__verbose(1, "Features for training:")
         self.__verbose(1, ", ".join(self.config['features']))
         self.__verbose(1, "")
@@ -197,9 +190,7 @@ class Model():
         self.x = pd.concat([pd.Series(np.ones(self.m)), self.x], axis=1)
     
     def __init_for_predict(self):
-        if self.config['mode'] == MODE_PREDICT:
-            self.__load_trained_data()
-        else:
+        if self.config['mode'] != MODE_PREDICT:
             self.df_correct_classes = self.df_to_predict[COLUMN_WITH_CLASSES]
 
         self.df_to_predict = self.df_to_predict.fillna(0)
