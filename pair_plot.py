@@ -6,14 +6,13 @@ from data import Data
 
 parser = argparse.ArgumentParser()
 parser.add_argument('filename', type=str)
+parser.add_argument('-c', '--corner', action='store_true', help="display corner plot instead")
 
 args = parser.parse_args()
 
 try:
-    datasetDF = pd.read_csv(args.filename, index_col=0)
-except:
-    log.error("Data file (%s) not found or invalid csv file." % args.filename)
+    data = Data(args.filename)
+    data.pair_plot(corner=args.corner)
+except Exception as e:
+    log.error(e)
     exit(1)
-
-data = Data(datasetDF)
-data.pair_plot()

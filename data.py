@@ -18,17 +18,24 @@ HOUSE_COLORS_DICT = {
 class Data():
     dataframe = None
 
-    def __init__(self, dataframe):
-        self.dataframe = dataframe
+    def __init__(self, filename):
+        self.__load_dataset(filename)
 
     def __get_numeric_columns(self):
-        return self.dataframe.select_dtypes(include=[int, float])
+        return self.df.select_dtypes(include=[int, float])
+
+    def __load_dataset(self, df_filename):
+        try:
+            self.df = pd.read_csv(df_filename, index_col=0)
+        except:
+            raise Exception("Data file (%s) not found or invalid csv file." % df_filename)
 
     def describe(self, toFile=False, filename=None):
         statsDF = pd.DataFrame(index=STATS_ROWS)
 
-        for column in self.dataframe:
-            feature = Feature(self.dataframe[column])
+        tmpDF = self.__get_numeric_columns()
+        for column in tmpDF:
+            feature = Feature(tmpDF[column])
             statsDF[column] = feature.get_statistics()
 
         if toFile:
@@ -75,18 +82,18 @@ class Data():
             self.histogram_one(column)
 
     def histogram_one(self, feature):
-        sns.histplot(self.dataframe, x=feature,
+        sns.histplot(self.df, x=feature,
                      element='step', fill=False, hue=GROUP_BY, palette=HOUSE_COLORS_DICT)
         plt.show()
 
     def scatter_plot(self, feat1, feat2):
-        sns.scatterplot(x=self.dataframe[feat1], y=self.dataframe[feat2],
-                        hue=self.dataframe[GROUP_BY], palette=HOUSE_COLORS_DICT)
+        sns.scatterplot(x=self.df[feat1], y=self.df[feat2],
+                        hue=self.df[GROUP_BY], palette=HOUSE_COLORS_DICT)
         plt.show()
 
-    def pair_plot(self):
+    def pair_plot(self, corner=False):
         log.info("Creating a pair plot. It might take a while, please wait.")
-        sns.pairplot(self.dataframe, corner=True,
+        sns.pairplot(self.df, corner=corner,
                     diag_kind = 'hist', diag_kws = {'bins':25, 'multiple':'stack'},
                     hue=GROUP_BY, palette=HOUSE_COLORS_DICT)
         plt.subplots_adjust(bottom=0.04)

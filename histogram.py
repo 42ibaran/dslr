@@ -11,15 +11,12 @@ parser.add_argument("--all", "-a", help="plot histograms for all features (desce
 args = parser.parse_args()
 
 try:
-    datasetDF = pd.read_csv(args.filename, index_col=0)
-except:
-    log.error("Data file (%s) not found or invalid csv file." % args.filename)
+    data = Data(args.filename)
+    result = data.find_most_homogeneous(all=args.all)
+    if args.all:
+        data.histogram_all(result)
+    else:
+        data.histogram_one(result)
+except Exception as e:
+    log.error(e)
     exit(1)
-
-data = Data(datasetDF)
-result = data.find_most_homogeneous(all=args.all)
-
-if args.all:
-    data.histogram_all(result)
-else:
-    data.histogram_one(result)

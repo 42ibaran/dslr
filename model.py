@@ -170,7 +170,10 @@ class Model():
 
         self.classes = {}
         self.y = self.df_to_train[COLUMN_WITH_CLASSES].astype('category')
-        classes_high_level = self.y.unique()
+        try:
+            classes_high_level = self.y.unique()
+        except:
+            raise Exception("Training dataset is missing classification data.")
         classes_low_level = self.y.cat.codes.unique()
         self.classes = { int(classes_low_level[i]): classes_high_level[i] for i in range(len(classes_low_level)) }
         self.y = self.y.cat.codes
