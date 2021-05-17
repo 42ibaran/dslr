@@ -8,19 +8,25 @@ STATS_ROWS = ['Count', 'Mean', 'Std', 'Min', '25%', '50%', '75%', 'Max']
 
 class Feature():
     series = None
+    filtered = None
 
     def __init__(self, series):
         self.series = series
-        self.filter_series()
-        # self.standardize()
+        self.filtered = self.filter_series()
 
-    def standardize(self):
-        self.mean_denorm = self.mean()
-        self.std_denorm = self.std()
-        self.series = (self.series - self.mean_denorm) / self.std_denorm
+    def __sub__(self, other):
+        return Feature(self.series - other)
+
+    def __pow__(self, other):
+        return Feature(self.series ** other)
+    
+    def __mul__(self, other):
+        if type(other) == Feature:
+            other = other.series
+        return Feature(self.series * other)
 
     def filter_series(self):
-        self.series = pd.Series([xi for xi in self.series if not np.isnan(xi)])
+        return pd.Series([xi for xi in self.series if not np.isnan(xi)])
 
     def get_statistics(self):
         return [
@@ -36,39 +42,39 @@ class Feature():
 
     def sum(self):
         sum = 0
-        for xi in self.series:
+        for xi in self.filtered:
             sum += xi
         return sum
 
     def count(self):
-        return len(self.series)
+        return len(self.filtered)
 
     def mean(self):
         return self.sum() / self.count()
 
     def std(self):
         mean = self.mean()
-        deviations = Feature(pd.Series([(xi - mean) ** 2 for xi in self.series]))
+        deviations = Feature(pd.Series([(xi - mean) ** 2 for xi in self.filtered]))
         variance = deviations.sum() / (deviations.count() - 1)
         return math.sqrt(variance)
 
     def min(self):
-        minX = self.series[0]
-        for xi in self.series:
+        minX = self.filtered[0]
+        for xi in self.filtered:
             if xi < minX:
                 minX = xi
         return minX
 
     def percentile(self, q):
-        x = self.series.sort_values().reset_index(drop=True)
+        x = self.filtered.sort_values().reset_index(drop=True)
         findex = q * (self.count() - 1) / 100
         lower = math.floor(findex)
         fraction = findex - lower
         return x[lower] + (x[lower + 1] - x[lower]) * fraction
 
     def max(self):
-        maxX = self.series[0]
-        for xi in self.series:
+        maxX = self.filtered[0]
+        for xi in self.filtered:
             if xi > maxX:
                 maxX = xi
         return maxX

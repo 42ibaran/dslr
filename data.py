@@ -41,13 +41,13 @@ class Data():
         homogeneity_dict = {}
 
         for column in tmpDF:
-            homogeneity_dict[column] = tmpDF[column].std()
+            feature = Feature(tmpDF[column])
+            homogeneity_dict[column] = feature.std()
         homogeneity_dict = {key: value for key, value in sorted(homogeneity_dict.items(), key=lambda item: item[1])}
         if all:
             return homogeneity_dict
         return next(iter(homogeneity_dict))
 
-    # TODO: replace stats with custom methods?
     def find_most_similar(self):
         tmpDF = self.__get_numeric_columns()
         p_dict = {}
@@ -55,9 +55,9 @@ class Data():
 
         for column1 in tmpDF:
             j = 0
-            x = tmpDF[column1]
+            x = Feature(tmpDF[column1])
             for column2 in tmpDF:
-                y = tmpDF[column2]
+                y = Feature(tmpDF[column2])
                 if j >= i:
                     continue
                 sqrt1 = math.sqrt(((x - x.mean()) ** 2).sum())
