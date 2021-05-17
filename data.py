@@ -76,7 +76,7 @@ class Data():
 
     def histogram_one(self, feature):
         sns.histplot(self.dataframe, x=feature,
-                     bins=50, multiple='stack', hue=GROUP_BY, palette=HOUSE_COLORS_DICT)
+                     element='step', fill=False, hue=GROUP_BY, palette=HOUSE_COLORS_DICT)
         plt.show()
 
     def scatter_plot(self, feat1, feat2):
